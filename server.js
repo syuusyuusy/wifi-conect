@@ -1,28 +1,27 @@
 import express from "express";
 import { WebSocketServer } from "ws";
+import http from "http";
 
 const app = express();
 const port = process.env.PORT || 3000;
 
-// HTTP サーバーを作成
-const server = app.listen(port, () => {
-  console.log("Server running on port", port);
-});
+// ★ HTTP サーバーを明示的に作成（これが重要）
+const server = http.createServer(app);
 
-// WebSocket サーバーを HTTP サーバーに紐づける
+// ★ WebSocket サーバーを HTTP サーバーに紐づける
 const wss = new WebSocketServer({ server });
 
-// クライアント接続時
+// ★ keep-alive（Render で切断されないために必須）
+function heartbeat() {
+  this.isAlive = true;
+}
+
 wss.on("connection", (ws) => {
   console.log("Client connected");
 
-  // keep-alive（切断防止）
   ws.isAlive = true;
-  ws.on("pong", () => {
-    ws.isAlive = true;
-  });
+  ws.on("pong", heartbeat);
 
-  // メッセージ受信時
   ws.on("message", (msg) => {
     console.log("Received:", msg.toString());
 
@@ -39,7 +38,7 @@ wss.on("connection", (ws) => {
   });
 });
 
-// 30 秒ごとに ping を送って接続維持
+// ★ 30秒ごとに ping を送って接続維持
 setInterval(() => {
   wss.clients.forEach((ws) => {
     if (!ws.isAlive) return ws.terminate();
@@ -47,3 +46,8 @@ setInterval(() => {
     ws.ping();
   });
 }, 30000);
+
+// ★ HTTP サーバーを起動
+server.listen(port, () => {
+  console.log("Server running on port", port);
+});
